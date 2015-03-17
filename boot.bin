@@ -1,0 +1,781 @@
+.cpu arm946e-s
+	.arch armv5te
+
+	.arm
+	.section .text.start
+	.global _start
+
+_start:
+	ldr r0, =0x8078c6e
+	ldr r1, =0x8078c2e
+	bl  sub_1ff9890
+	ldr r0, =0x20a00000
+	blx initFirmware	
+	ldr r0, =0x1dcd6500
+	mov r1, #0x0
+	bl  svcSleepThread
+	ldr r0, =0x20a00000
+	bl  sub_1ff9420
+	bl  svcBackDoor
+	adr r0, memory_permission
+	svc 0x7b @ void backdoor(void *address); 
+	blx sub_1ff8c54
+
+start_loop:
+	b 	start_loop
+
+memory_permission:                            
+	LDR             R0, =0x10000035
+	MCR             p15, 0, R0,c6,c3, 0
+	MRC             p15, 0, R0,c2,c0, 0
+	MRC             p15, 0, R12,c2,c0, 1
+	MRC             p15, 0, R1,c3,c0, 0
+	MRC             p15, 0, R2,c5,c0, 2
+	MRC             p15, 0, R3,c5,c0, 3
+	LDR             R4, =0x18000035
+	BIC             R2, R2, #0xF0000
+	BIC             R3, R3, #0xF0000
+	ORR             R0, R0, #0x10
+	ORR             R2, R2, #0x30000
+	ORR             R3, R3, #0x30000
+	ORR             R12, R12, #0x10
+	ORR             R1, R1, #0x10
+	MCR             p15, 0, R0,c2,c0, 0
+	MCR             p15, 0, R12,c2,c0, 1
+	MCR             p15, 0, R1,c3,c0, 0
+	MCR             p15, 0, R2,c5,c0, 2
+	MCR             p15, 0, R3,c5,c0, 3
+	MCR             p15, 0, R4,c6,c4, 0
+	MRC             p15, 0, R0,c2,c0, 0
+	MRC             p15, 0, R1,c2,c0, 1
+	MRC             p15, 0, R2,c3,c0, 0
+	ORR             R0, R0, #0x20
+	ORR             R1, R1, #0x20
+	ORR             R2, R2, #0x20
+	MCR             p15, 0, R0,c2,c0, 0
+	MCR             p15, 0, R1,c2,c0, 1
+	MCR             p15, 0, R2,c3,c0, 0
+	BX              LR
+
+sub_1ff9890:
+	stmfd	sp!, {r0, r1, r4, lr}
+	adr     r2, word_1ff9730
+	add     r0, r0, #0x2
+	add     r1, r1, #0x2
+
+	ldrh    r3, [r2]
+	strh    r3, [r0]
+	strh    r3, [r1]
+	
+	ldrh    r3, [r2, #2]
+	strh	r3, [r0, #2]
+	strh 	r3, [r1, #2]
+	
+	ldrh    r3, [r2, #4]
+	strh	r3, [r0, #4]
+	strh 	r3, [r1, #4]
+	
+	ldrh    r3, [r2, #6]
+	strh	r3, [r0, #6]
+	strh 	r3, [r1, #6]
+	
+	add     r0, r0, #0x34
+	add     r1, r1, #0x34
+	adr     r2, word_1ff9848
+	adr     r3, word_1ff9850
+	
+	ldrh    r4, [r2]
+	strh    r4, [r0]
+	ldrh    r4, [r3]
+	strh    r4, [r1]
+	
+	ldrh	r4, [r2, #2]
+	strh    r4, [r0, #2]
+	ldrh    r4, [r3, #2]
+	strh    r4, [r1, #2]
+
+	ldrh    r4, [r2, #4]
+	strh    r4, [r0, #4]
+	ldrh    r4, [r3, #4]
+	strh    r4, [r1, #4]
+	
+	ldrh	r4, [r2, #6]
+	strh    r4, [r0, #6]
+	ldrh    r4, [r3, #6]
+	strh    r4, [r1, #6]
+
+	@ Result FlushProcessDataCache(Handle process, void const * addr, u32 size)
+	mov r2, #0x44 @ size
+	ldr r1, [sp] @ addr  
+	ldr r0, =0xFFFF8001 @ KProcess
+	svc 0x54
+
+	mov r2, #0x44 @ size
+	ldr r1, [sp, #0x4] @ addr
+	ldr r0, =0xFFFF8001 @ KProcess
+	svc 0x54
+
+	ldmfd sp!, {r0, r1, r4, pc}
+
+
+@ r0 = 0x20a00000
+initFirmware: @ 2 bytes here 
+	push  {r4, r5, lr}
+	mov   r4, #0 @ r4 = 0
+	sub   sp, sp, #0x4c @ sp -= 0x4c
+	mov   r5, r0 @ r5 = r0
+	mov   r1, r4 @ r1 = r4
+	add   r0, sp, #0x28 @ r0 = 0x20a00028 + sp
+	mov   r2, #0x20 @ r2 = 0x20
+	str   r4, [sp, #4] @ sp[4] = r4
+	bl    writeByte @ writeByte(0x20a00028 + sp, 0, 0x20)
+	add   r0, sp, #0x8 @  r0 = 0x20a00030 + sp
+	mov   r1, r4  @ r1 = 0
+	mov   r2, #0x20 @ r2 = 0x20
+	bl    writeByte @ writeByte(0x20a00030 + sp, 0, 0x20);
+	adr   r0, firm_0 @ r0 = firm_0
+	add   r1, sp, #0x8 @ r1 = sp + 0x8
+	mov   r2, #0x8 @ size
+	bl    memcpy16
+	add   r1, sp, #0x8
+	mov   r2, #0x1
+	add   r0, sp, #0x28
+	bl    arm9_call_unk
+	mov   r3, #0x400000
+	add   r1, sp, #0x4
+	mov   r2, r5
+	add   r0, sp, #0x28
+	bl    arm9_call_unk2
+	add   r0, sp, #0x28
+	bl    arm9_call_unk3
+	ldr   r3, [sp, #4]
+	cmp   r3, r4
+	bne   loc_1ff8b5e
+
+loc_1ff8b50:
+	mov   r0, #0x70
+	bl    clearScreen
+	mov   r0, #0x80
+	bl    clearScreen
+	b     loc_1ff8b50
+
+loc_1ff8b5e:
+	add   sp, sp, #0x4c
+	pop   {r4, r5, pc} 
+
+
+@ void writeByte(void* adr, u8 value, u32 size)
+writeByte:
+	push {lr}
+	cmp  r2, #0 
+	beq  writeByte_return @ if r2 == 0 jump pc
+	add  r2, r0, r2 @ for(int i = 0; i < r2 + r0; i++)
+
+writeByte_loop:
+
+	cmp  r0, r2 @ r0 == r2 ?
+	beq  writeByte_return @ jump to pc
+	strb r1, [r0] @ write a byte
+	add  r0, #1 @ r0++
+	b    writeByte_loop @ back to loop
+
+writeByte_return:
+	pop  {pc}
+
+
+@ void memcpy16(void *src, void *dst, u32 size)
+@ it is very strange, i know, but it just copy a string8 to string16
+@ loop the "loop", you can see, "strb r3, [r1, #1] = 0, and strb r4, [r1] = value of r4 "
+
+memcpy16: 
+	push {r4, lr}
+	add r2, r0, r2 @ r2 = r0 + r2
+	mov r3, #0 @ r3 = 0
+
+memcpy16_loop:
+	cmp r2, r0 @ if(r2 == r0)
+	beq memcpy16_end @ jump pop {r4, pc}
+	ldrb r4, [r0] @ r4 = value(r0)
+	strb r3, [r1, #1] @ r1[1] = 0(r3 is 0)
+	strb r4, [r1] @ r1[0] = r4
+	add  r0, #0x1 @ r0++
+	add  r1, #0x2 @ r1++
+	b  memcpy16_loop @ jump loop
+
+memcpy16_end:
+	pop {r4, pc}
+
+
+arm9_call_unk:
+	push {r4, lr}
+	push {r5, r6}
+	mov  r5, #0x1f @ r5 = 0x1f
+	ldr  r6, =dword_1ff800c @ r6 = address 1ff800c
+	ldr  r6, [r6] @ r6 = value of (address 1ff800c)
+	cmp  r5, r6   @ r5 == r6 ? 
+	bne  arm9_call_unk_goto @ r4 = 0x805ada1 
+	ldr  r4, =0x805cf05 @ ldr r4 = 0x805cf05
+	b    arm9_call_unk_else @ go to end
+
+arm9_call_unk_goto:
+	ldr  r4, =0x805ada1 @ r4 = 0x805ada1
+
+arm9_call_unk_else:
+	pop {r5, r6}
+	blx r4
+	pop {r4, pc}
+
+arm9_call_unk2:
+	push {r4, lr}
+	push {r5, r6}
+	mov  r5, #0x1f @ r5 = 0x1f
+	ldr  r6, =dword_1ff800c @ r6 = address 1ff800c
+	ldr  r6, [r6] @ r6 = value of (address 1ff800c)
+	cmp  r5, r6   @ r5 == r6 ? 
+	bne  arm9_call_unk_goto @ r4 = 0x805ada1 
+	ldr  r4, =0x804E315 @ ldr r4 = 0x805cf05
+	b    arm9_call_unk_else @ go to end
+
+arm9_call_unk_goto2:
+	ldr  r4, =0x804D70D @ r4 = 0x805ada1
+
+arm9_call_unk_else2:
+	pop {r5, r6}
+	blx r4
+	pop {r4, pc}
+
+arm9_call_unk3:
+	push {r4, lr}
+	push {r5, r6}
+	mov  r5, #0x1f @ r5 = 0x1f
+	ldr  r6, =dword_1ff800c @ r6 = address 1ff800c
+	ldr  r6, [r6] @ r6 = value of (address 1ff800c)
+	cmp  r5, r6   @ r5 == r6 ? 
+	bne  arm9_call_unk_goto @ r4 = 0x805ada1 
+	ldr  r4, =0x805CFC5 @ ldr r4 = 0x805cf05
+	b    arm9_call_unk_else @ go to end
+
+arm9_call_unk_goto3:
+	ldr  r4, =0x805AE8D @ r4 = 0x805ada1
+
+arm9_call_unk_else3:
+	pop {r5, r6}
+	blx r4
+	pop {r4, pc}
+
+@ r0 = #0x70 
+@ r0 = #0x80
+clearScreen: @ void ClearScreen(int color)
+	push {r4-r6, lr}
+	ldr  r5, =0x46500 @ TopFrameBuffer Size
+	mov  r4, r0
+	mov  r2, r5
+	mov  r1, r4
+	ldr  r0, =0x20184E60
+	mov  r6, #0xE1
+	bl   writeByte
+	lsl  r6, r6, #0xa
+	mov  r2, r5
+	mov  r1, r4
+	ldr  r0, =0x20282160
+	bl   writeByte
+	mov  r2, r5
+	mov  r1, r4
+	ldr  r0, =0x202118E0
+	bl   writeByte
+	mov  r2, r5
+	mov  r1, r4
+	ldr  r0, =0x201CB370
+	bl   writeByte
+	mov  r2, r5
+	mov  r1, r4
+	ldr  r0, =0x202C8670
+	bl   writeByte
+	mov  r2, r5
+	mov  r1, r4
+	ldr  r0, =0x20249CF0
+	bl   writeByte
+	pop {r4-r6, pc}
+
+svcSleepThread:
+	svc 	0xA
+	bx      lr
+
+
+sub_1ff9420: @ void sub_1ff9420(r0) r0 = 0x20a00000
+	stmfd   sp!, {r4-r6,lr}
+	mov     r4, r0 @ r4 = 0x20a00000
+	mov     r5, #0 @ r5 = 0
+
+loc_1ff942c:
+	mov     r3, #0x30 @ r3 = 0x30
+	mul     r1, r5, r3 @ r1 = 30 * 0x0
+	add     r1, r1, #0x40 @
+	add     r1, r1, r4 @ r1 = r1 + 0x20a00000
+	ldr     r3, [r1, #8] @ r3 = 0x20a00000 + 8 ?
+	cmp     r3, #0x0 @ r3 == 0 ?
+	beq     loc_1ff9480 @ goto loc_1ff 
+	ldr     r3, [r1] @ r3 = value(r1)
+	add     r0, r4, r3 @ r0 = 0x20a00000 + r3
+	mov     r2, r4 @ r2 = 0x20a00000
+	ldr     r3, [r1, #0xc] @ r3 = 0x20a00000 + 0xc
+	cmp     r3, #0x0 @ r3 == 0 ?
+	bne     loc_1ff946c @ if r3 != 0 goto
+	ldr     r1, [r1, #0x8] @ r1 = r1 + 8
+	bl      clientMode @ goto clientMode
+	b       loc_1ff9480 @ goto loc_1ff9480
+ 
+loc_1ff946c: 
+	@ Get value of r1 + 8 and put on r1
+	@ if r5 == 0, goto sub_1ff9588
+	@ if r5 == r1, goto sub_1ff9598
+	ldr  r1, [r1, #8]
+	cmp  r5, #0x0
+	bleq sub_1ff9588
+	cmp  r5, #0x1
+	bleq sub_1ff9598
+
+loc_1ff9480:
+	@ while(r5 < 4)
+	@ goto loc_1ff942c
+	add  r5, r5, #1
+	cmp  r5, #4
+	blt  loc_1ff942c
+
+	ldmfd sp!, {r4-r6, pc}
+
+
+sub_1ff9588: @Garbage ?
+	stfmd sp!, {r4-r8, lr}
+	sub  sp, sp, #0x14
+	add  sp, sp, #0x14
+	ldfmd sp!, {r4-r8, pc}
+
+sub_1ff9598: @Garbage ?
+	stfmd sp!, {r4-r6, lr}
+	ldfmd sp!, {r4-r6, pc}
+
+
+
+clientMode: @ void sub_1ff9490(r0, r1)
+	stmfd sp!, {r4-r6, lr}
+	sub   sp, sp, #0x4
+	mov   r4, r1
+	ldr   r1, =0x636F7250
+	ldr   r2, =0x39737365
+
+loc_1ff94a4:
+	ldr  r3, [r0]
+	cmp  r3, r1
+	ldreq r3, [r0, #4]
+	cmpeq r3, r2
+	beq  loc_1ff94cc
+	sub  r4, r4, #8
+	add  r0, r0, #8
+	cmp  r4, #0
+	bgt  loc_1ff94a4
+	b    loc_1ff9554
+
+loc_1ff94cc:
+	ldr r4, [r0, #0x10]
+	add r0, r0, #0xA00
+	mov r5, r0
+	ldr r0, =0x10146000 
+	ldrh r1, [r0]
+	ands r1, r1, #0x200
+	bne loc_1FF9504
+	ldr r0, =0x8087250
+	ldr r1, =sub_1ff8d18
+	ldr r2, =0xE51FF004
+	sub r0, r0, r4
+	add r0, r0, r5
+	str r2, [r0]
+	str r1, [r0, #4]
+
+
+loc_1FF9504:
+	ldr r0, =0x804d5c0
+	mov r1, #0x2000
+	ldr r2, =0x4770
+	sub r0, r0, r4
+	add r0, r0, r5
+	strh r1, [r0]
+	ldr  r0, =0x805fac0
+	sub  r0, r0, r4
+	add  r0, r0, r5
+	strh r1, [r0]
+	strh r2, [r0, #2]
+	ldr  r1, =0x8078c6e
+	ldr  r2, =0x8078c2e
+	sub  r1, r1, r4
+	add  r1, r1, r5
+	sub  r2, r2, r4
+	add  r2, r2, r5
+	mov  r0, r1
+	mov  r1, r2
+	bl  sub_1ff9948
+
+loc_1ff9554:
+	add   sp, sp, #4
+	ldmfd sp!, {r4-r6, pc}
+
+
+sub_1FF9948:                           
+	STMFD           SP!, {R0,R1,R4,LR}
+	ADR             R2, word_1FF9730
+	ADD             R0, R0, #2
+	ADD             R1, R1, #2
+	LDRH            R3, [R2]
+	STRH            R3, [R0]
+	STRH            R3, [R1]
+	LDRH            R3, [R2,#2]
+	STRH            R3, [R0,#2]
+	STRH            R3, [R1,#2]
+	LDRH            R3, [R2,#4]
+	STRH            R3, [R0,#4]
+	STRH            R3, [R1,#4]
+	LDRH            R3, [R2,#6]
+	STRH            R3, [R0,#6]
+	STRH            R3, [R1,#6]
+	ADD             R0, R0, #0x34
+	ADD             R1, R1, #0x34
+	ADR             R2, word_1FF9738
+	ADR             R3, word_1FF9740
+	LDRH            R4, [R2]
+	STRH            R4, [R0]
+	LDRH            R4, [R3]
+	STRH            R4, [R1]
+	LDRH            R4, [R2,#2]
+	STRH            R4, [R0,#2]
+	LDRH            R4, [R3,#2]
+	STRH            R4, [R1,#2]
+	LDRH            R4, [R2,#4]
+	STRH            R4, [R0,#4]
+	LDRH            R4, [R3,#4]
+	STRH            R4, [R1,#4]
+	LDRH            R4, [R2,#6]
+	STRH            R4, [R0,#6]
+	LDRH            R4, [R3,#6]
+	STRH            R4, [R1,#6]
+	LDMFD           SP!, {R0,R1,R4,PC}
+
+
+svcBackDoor:
+	ADR     r0, sub_1ff9710
+	svc     0x7b
+	bx      lr
+
+sub_1ff9710:
+	stmfd   sp!, {r0-r12, lr}
+	bl      flushDataCache
+	ldmfd   sp!, {r0-r12, lr}
+	bx      lr
+
+
+flushDataCache: 
+	mov 	r0, #0 @ icache function ?
+	mcr 	p15, 0, r0, c7, c5, 0 @ Invalidate entire instruction cache 
+    mov 	r1, #0
+
+loc_1ff96dc:
+	mov 	r0, #0
+
+loc_1ff96e0:
+	orr     r2, r1, r0
+	mcr     p15, 0, r2, c7, c14, 0 @Clean and invalidate data cache line by Set/Way
+	add     r0, r0,, #0x20
+	cmp     r0, #0x400
+	bne     loc_1ff96e0
+	add     r1, r1, #0x40000000
+	cmp     r1, #0
+	bne     loc_1ff96dc
+	ret
+
+sub_1ff8c54:
+	push   {r3, lr}
+	bl      sub_1ff8c1c
+
+
+sub_1ff8c1c:
+	push    {r3, lr}
+	mov     r0, #0x0
+	bl      clearScreen
+	bl      ARM11_Exploit
+	bl      PXI
+	mov     r0, #0xff
+	bl      clearScreen
+	bl      waitARM11
+	bl      sub_1ff99f0
+	bl      sub_1ff9a44
+	bl      sub_1ff8b68
+	bl      sub_1ff9a58
+	ldr     r0, =0x20A00000
+	bl      sub_1ff9a2c
+
+loc_1ff8c4c:
+	b       loc_1ff8c4c
+	
+	.thumb
+	.code16
+ARM11_Exploit: @ here change thumb mode to ARM mode
+	BX      PC
+
+	.align  4
+	.code32
+
+loc_1ff9a20:
+	b      svcBackDoorARM11
+
+
+svcBackDoorARM11:
+	ADR    r0, sub_1ff8120
+	svc    0x7b
+	bx     lr
+
+code_arm11:
+	clrex 
+	cps   #0x13
+	mov   r1, #0
+	mcr   p15, 0, r1, c7, c14, 0
+	mcr   p15, 0, r1, c7, c10, 4
+	ldr   r1, =0xEEEEEEEE
+	ldr   r2, =0xf4ebe8bc
+	ldr   r3, [r2]
+	cmp   r1, r3
+	beq   loc_1ff9c60
+	ldr   r1, =0xEEEEEEEE
+	ldr   r2, =0xf4ebe8bc
+	str   r1, [r2]
+	ldr   r1, =0xffffff00
+	ldr   r2, =0xf0008
+	str   r2, [r1]
+	mov   r1, #0
+	mcr   p15, 0, r1, c7, c14, 0
+	mcr   p15, 0, r1, c7, c10, 4
+	mov   r0, #0
+	mov   r1, #0
+	mov   r2, #0
+	mov   r3, #0
+	svc   0x7C @ Kernel SetState
+
+loc_1ff9c60:
+	mrc   p15, 0, r0, c0, c0, 5
+	ands  r0, r0, #3
+	beq   loc_1ff9cb4
+
+loc_1ff9c6c:
+	ldr   r1, =0x1e85de
+	mov   r2, #0xFFFFFFFF
+	bl    sub_1ff9d34
+	ldr   r1, =0xAAAAAAAA
+	ldr   r2, =0xF4EBE8B0
+	str   r1, [r2]
+	ldr   r0, =0xFFFD6204
+	ldr   r1, =0x10000FF
+	str   r1, [r0]
+	mov   r1, #0
+	mcr   p15, 0, r1, c7, c14, 0
+	mcr   p15, 0, r1, c7, c10, 4
+	ldr   r0, =0xf4ebe8b8
+	ldr   r1, [r0]
+	mov   r2, #0
+	cmp   r1, r2
+	bne   loc_1ff9cfc
+	b     loc_1ff9c6c
+
+loc_1ff9cb4:
+	ldr   r1, =0x1e85de
+	mov   r2, #0xFFFFFFFF
+	bl    sub_1ff9d34
+	ldr   r1, =0xAABBCCDD
+	ldr   r2, =0xF4EBE8B4
+	str   r1, [r2]
+	ldr   r0, =0xFFFD6204
+	ldr   r1, =0x100FF00
+	str   r1, [r0]
+	mov   r1, #0
+	mcr   p15, 0, r1, c7, c14, 0
+	mcr   p15, 0, r1, c7, c10, 4
+	ldr   r0, =0xf4ebe8b8
+	ldr   r1, [r0]
+	mov   r2, #0
+	cmp   r1, r2
+	bne   loc_1ff9cfc
+	b     loc_1ff9cb4
+
+loc_1ff9cfc:
+	cpsid AIF, #0x13 @ Disble interrupt
+	mov   r5, r1
+	ldr   r0, =0xFFFD6204
+	ldr   r1, =0x1FFFF00
+	str   r1, [r0]
+	mov   r1, #0
+	mcr   p15, 0, r1, c7, c14, 0
+	mcr   p15, 0, r1, c7, c10, 4
+	mov   r0, #0
+	mov   r1, #0
+	mov   r2, #0
+	mov   r3, #0
+	mov   r4, #0
+	bx    r5
+
+
+sub_1ff9d34:
+	subs r2, r2, #1
+	bgt  sub_1ff9d34
+	subs r1, r1, #1
+	bgt  sub_1ff9d34
+	bx   lr
+
+arm11_code:
+	push  {r3, lr}
+	mov   r2, #0xc0
+	ldr   r0, =0x1fff4b40 @ Exception Vectors exploit to get control of arm11
+	ldr   r1, =code_arm11
+	lsl   r2, r2, #1
+	bl    memcpy
+	pop   {r3, pc}
+
+
+memcpy: @ void memcpy(void *dst, void* src, int size)
+	push {r4, lr}
+	mov   r3, #0x0
+
+memcpy_loop:
+	cmp   r2, r3
+	beq   memcpy_end
+	ldrb  r4,[r1, r3]
+	strb  r4,[r0, r3]
+	add   r3, #0x1
+	b  memcpy_loop
+
+memcpy_end:
+	pop {r4, pc}
+
+
+sub_1ff8120:
+	stmfd  sp!, {r0-r12, lr}
+	blx    arm11_code
+	bl     flushDataCache
+	ldr    r1, =0xEA0002CE
+	ldr    r0, =0x1fff4000
+	str    r1, [r0]
+	sub    r1, r1, #1
+	add    r0, r0, #4
+	str    r1, [r0]
+	sub    r1, r1, #1
+	add    r0, r0, #4
+	str    r1, [r0]
+	sub    r1, r1, #1
+	add    r0, r0, #4
+	str    r1, [r0]
+	sub    r1, r1, #1
+	add    r0, r0, #4
+	str    r1, [r0]
+	sub    r1, r1, #1
+	add    r0, r0, #4
+	str    r1, [r0]
+	sub    r1, r1, #1
+	add    r0, r0, #4
+	str    r1, [r0]
+	sub    r1, r1, #1
+	add    r0, r0, #4
+	str    r1, [r0]
+	ldr    r0, =0x24ebe8b8
+	mov    r1, #0
+	str    r1, [r0]
+	bl     flushDataCache
+	ldmfd  sp!, {r0-r12, lr}
+	bx     lr						
+
+PXI_function:
+	ldr    r0, =0x10008000
+
+PXI_function_loop:
+	ldrh   r1, [r0, #4]
+	lsl    r1, r1, #0x17
+	bmi    PXI_function_loop
+	ldr    r0, [r0, #0xc]
+	mov    pc, lr
+
+PXI_function2:
+	ldr    r1, =0x10008000
+
+PXI_function_loop2:
+	ldrh   r2, [r1, #0x4]
+	lsl    r2, r2, #0x1E
+	bmi    PXI_function_loop2
+	ldr    r0, [r1, #0x8]
+	mov    pc, lr
+
+
+PXI:
+	push   {r3, lr}
+	ldr    r2, =0xFFF82840
+	ldr    r3, =0x24ebe8b8
+	str    r2, [r3]
+	bl     sub_1ff9a24
+
+loc_1ff8ba8:
+	bl     PXI_function
+	ldr    r3, =0x44836
+	cmp    r0, r3
+	bne    loc_1ff8ba8
+	ldr    r0, =0x964536
+	bl     PXI_function2
+
+loc_1ff8bb8:
+	bl     PXI_function
+	ldr    r3, =0x44837
+	cmp    r0, r3
+	bne    loc_1ff8bb8
+	bl     PXI_function
+	bl     PXI_function
+
+loc_1ff8bca:
+	bl     PXI_function
+	ldr    r3, =0x44846
+	cmp    r0, r3
+	bne    loc_1ff8bca
+	pop    {r3, pc}
+
+sub_1ff9a24: 
+	bx      pc
+	.align  4
+	.code32
+
+loc_1ff9a28:
+	b     svcBackDoor
+
+
+sub_1ff8bf0:
+
+
+@--------------------------------------------------------------
+@				 VALUES AND VAR AND STRING AND BLA BLA
+@--------------------------------------------------------------
+
+dword_1ff800c:   .word  0x1f
+
+word_1ff9730:    .short 0x4F00
+word_1ff9732:    .short 0x47B8
+word_1ff9734:	 .short 0x9748
+word_1FF9736:    .short 0x1FF               
+word_1FF9738:    .short 0x4F00              
+word_1FF973A:    .short 0x47B8              
+word_1FF973C:    .short 0x9810              
+word_1FF973E:    .short 0x1FF              
+word_1FF9740:    .short 0x4F00              
+word_1FF9742:    .short 0x47B8             
+word_1FF9744:    .short 0x982C             
+word_1FF9746:    .short 0x1FF              
+
+word_1ff9848:
+	.short 0x4F00
+word_1ff9850:
+	.short 0x4F00
+
+
+
+firm_0:
+	.string8 "firm0:/"
