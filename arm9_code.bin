@@ -1,0 +1,137 @@
+.cpu arm946e-s
+	.arch armv5te
+	.data
+
+	.arm
+	.section .text.start
+	.global _start
+
+_start:
+	nop
+	nop
+	blx MainCode
+	ldr r0, =0x01FF8000 @ Instruction TCM
+	bx r0
+	mov r0, #0 
+	mcr 15, 0, r0, cr8, cr5, 0 
+	mcr 15, 0, r0, cr8, cr6, 0
+	mcr 15, 0, r0, cr8, cr7, 0
+	mcr 15, 0, r0, cr7, cr10, 0
+	bx lr 
+
+
+	.code 16 @ Thum16 mode
+	.align
+ARM9_function1:
+	push  {r4, lr}
+	ldr	r4, =0x805cf05
+	blx r4
+	pop {r4, pc}
+
+ARM9_function2:
+	push {r4, lr}
+	ldr r4, =0x805cfc5
+	blx r4
+	pop {r4, pc}
+
+ARM9_function3:
+	push {r4, lr}
+	ldr r4, =0x804e315
+	blx r4
+	pop {r4, pc}
+
+ARM9_function4:
+	push {r4, lr}
+	ldr r4, =0x805def5
+	blx r4
+	pop  {r4, pc}
+
+
+fail_junk:
+	nop 
+	nop
+
+fail_junk2:
+	ldr r0, =0xDEADBEEF
+	
+
+memset:            
+	PUSH            {LR}
+	CMP             R2, #0
+	BEQ             end_memset
+	ADD             R2, R0, R2
+			
+	B               start_memset
+@ it's not hard to understand i think
+@ is just a for :3 or while 
+set_byte:                            
+    STRB            R1, [R0]
+    ADD             R0, #1
+
+start_memset:                           
+    CMP             R0, R2
+    BNE             set_byte
+
+end_memset:                    
+    POP             {PC}
+
+
+CopyStringToMemory:
+	push {r4, lr}
+	add r2, r0, r2
+	mov r3, #0
+	b  end_cond
+do_it:
+	ldrb r4, [r0]
+	strb r3, [r1,#1]
+	strb r4, [r1]
+	add r0, #1
+	add r1, #2
+end_cond:
+	cmp  r0, r2
+	bne  do_it @ While r0 != r2, do_it
+	pop  {r4, pc}
+
+
+
+MainCode:
+	push {r4, lr}
+	sub sp, sp, #0xA8
+	mov r4, #0
+	add r1, sp, #0x08
+	adr r0, boot_bin
+	mov r2, #0xf
+	str r4, [sp]
+	str r4, [sp, #0x4]
+	bl  CopyStringToMemory
+
+	add r0, sp, #0x28
+	mov r1, r4
+	mov r2, #0x20
+	bl memset
+	
+	add r0, sp,  #0x28
+	add r1, sp,  #0x8
+	mov r2, #1
+	bl ARM9_function1
+	
+	add r0, sp, #0x28
+	add r1, sp, #0x4
+	bl ARM9_function4
+	
+	add r0, sp, #0x28
+	mov r1, sp 
+	ldr r2, =0x1FF8000
+	add r3, sp, #0x4 
+	bl ARM9_function3 @ Read boot.bin ?
+	
+	add r0, sp, #0x28
+	bl ARM9_function2
+	
+	add sp, sp, #0xA8
+	pop {r4,pc}
+	
+	
+	boot_bin:
+	
+	.string8 "sdmc:/boot.bin"
