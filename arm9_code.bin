@@ -10,18 +10,12 @@ _start:
 	nop
 	nop
 	blx MainCode
-	ldr r0, =0x01FF8000 @ Instruction TCM
-	bx r0
-	mov r0, #0 
-	mcr 15, 0, r0, cr8, cr5, 0 
-	mcr 15, 0, r0, cr8, cr6, 0
-	mcr 15, 0, r0, cr8, cr7, 0
-	mcr 15, 0, r0, cr7, cr10, 0
-	bx lr 
+	ldr r1, =0x01FF8000 @ Instruction TCM
+	blx sp
 
 
 	.code 16 @ Thum16 mode
-	.align
+	.align 4
 ARM9_function1:
 	push  {r4, lr}
 	ldr	r4, =0x805cf05
@@ -135,3 +129,7 @@ MainCode:
 	boot_bin:
 	
 	.string8 "sdmc:/boot.bin"
+	ldr r1, =0xFFF748C4
+	ldr r1, =[0xFF]
+	mov r0, r1
+	add r1, r2, #1
