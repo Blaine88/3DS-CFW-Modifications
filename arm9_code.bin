@@ -129,7 +129,7 @@ MainCode:
 	boot_bin:
 	
 	.string8 "sdmc:/boot.bin"
-	ldr r1, =0xEFF83C97
+	ldr r1, =0xFFF748C4
 	ldr r1, =[0xFF]
 	mov r0, r1
 	add r1, r2, #1
